@@ -27,11 +27,15 @@
 
                     {{-- ALWAYS show Admin Console if user is an Admin --}}
                     @if(Auth::check() && Auth::user()->role === 'admin')
+                        
                         <li class="nav-item">
-                            <a class="nav-link text-danger" href="{{ route('admin.dashboard') }}">Admin Console</a>
+                            <a class="nav-link text-warning" href="{{ route('admin.dashboard') }}">Admin Console</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url('/admin/users') }}">Manage Users</a>
+                            <a class="nav-link" href="{{ route('admin.users') }}">Manage Users</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('admin.products') }}">Manage Products</a>
                         </li>
                     @endif
 

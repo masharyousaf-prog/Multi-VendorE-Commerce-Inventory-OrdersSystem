@@ -1,7 +1,25 @@
 @extends('layouts.app')
 
 @section('content')
-<h1 class="mb-4">Product Catalog</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Product Catalog</h1>
+
+    <form action="{{ url('/') }}" method="GET" class="d-flex">
+        <input
+            type="text"
+            name="search"
+            class="form-control me-2"
+            placeholder="Search products..."
+            value="{{ request('search') }}"
+            style="width: 250px;"
+        >
+        <button class="btn btn-outline-primary" type="submit">Search</button>
+
+        @if(request('search'))
+            <a href="{{ url('/') }}" class="btn btn-outline-secondary ms-2">Reset</a>
+        @endif
+    </form>
+</div>
 
 <div class="row">
     @foreach($products as $product)

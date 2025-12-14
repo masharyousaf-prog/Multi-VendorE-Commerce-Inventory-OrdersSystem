@@ -19,7 +19,7 @@ Route::post('/checkout', [CartController::class, 'placeOrder'])->name('checkout.
 // THIS IS THE MISSING LINE:
 Route::delete('/cart/remove/{id}', [CartController::class, 'removeItem'])->name('cart.remove');
 
-// Vendor Routes (Protected)
+// Vendor Routes
 
     Route::get('/vendor/dashboard', [VendorController::class, 'dashboard'])->name('vendor.dashboard');
     Route::get('/vendor/products/create', [VendorController::class, 'createProduct']);
@@ -28,10 +28,12 @@ Route::delete('/cart/remove/{id}', [CartController::class, 'removeItem'])->name(
     Route::put('/vendor/products/{id}', [VendorController::class, 'updateProduct']);
 
 
-// Admin Routes (Protected)
+// Admin Routes
 
     Route::get('/admin/console', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     Route::get('/admin/users', [AdminController::class, 'users'])->name('admin.users');
+    Route::get('/admin/products', [AdminController::class, 'products'])->name('admin.products');
+    Route::delete('/admin/products/{id}', [AdminController::class, 'deleteProduct'])->name('admin.products.delete');
 
 // --- AUTHENTICATION ROUTES ---
 
