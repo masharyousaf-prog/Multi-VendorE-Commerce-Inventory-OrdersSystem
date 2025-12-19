@@ -23,6 +23,7 @@ class Product extends Model
         'price',
         'stock',
         'image',
+        'discount'
     ];
 
     /**
@@ -51,5 +52,16 @@ class Product extends Model
     public function cartItems(): HasMany
     {
         return $this->hasMany(CartItem::class);
+    }
+
+    // HELPER: Calculate Final Price automatically
+    // Usage: $product->final_price
+    public function getFinalPriceAttribute()
+    {
+        if ($this->discount > 0) {
+            $discountAmount = ($this->price * $this->discount) / 100;
+            return round($this->price - $discountAmount, 2);
+        }
+        return $this->price;
     }
 }

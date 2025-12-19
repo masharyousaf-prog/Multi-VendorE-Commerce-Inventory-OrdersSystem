@@ -34,6 +34,12 @@ Route::delete('/cart/remove/{id}', [CartController::class, 'removeItem'])->name(
     Route::get('/admin/users', [AdminController::class, 'users'])->name('admin.users');
     Route::get('/admin/products', [AdminController::class, 'products'])->name('admin.products');
     Route::delete('/admin/products/{id}', [AdminController::class, 'deleteProduct'])->name('admin.products.delete');
+    Route::get('/admin/reports/customers', [AdminController::class, 'customerReport'])->name('admin.reports.customers');
+    Route::get('/admin/reports/customers/download', [AdminController::class, 'downloadCustomerReportPdf'])
+     ->name('admin.reports.customers.download');
+
+    Route::get('/admin/reports/vendors', [AdminController::class, 'vendorReport'])->name('admin.reports.vendors');
+    Route::get('/admin/reports/vendors/download', [AdminController::class, 'downloadVendorReportPdf'])->name('admin.reports.vendors.download');
 
 // --- AUTHENTICATION ROUTES ---
 

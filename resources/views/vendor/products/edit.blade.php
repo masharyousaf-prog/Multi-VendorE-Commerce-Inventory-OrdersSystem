@@ -41,6 +41,12 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Discount Percentage (%)</label>
+                        <input type="number" name="discount" class="form-control" min="0" max="100" value="0">
+                        <small class="text-muted">Enter 0 for no discount. Example: Enter 20 for 20% Off.</small>
+                    </div>
+
+                    <div class="mb-3">
                         <label>Description</label>
                         <textarea name="description" class="form-control" rows="3">{{ $product->description }}</textarea>
                     </div>
