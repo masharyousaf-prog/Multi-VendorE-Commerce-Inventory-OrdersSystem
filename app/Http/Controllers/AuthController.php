@@ -7,17 +7,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
+// Notifications
+use App\Notifications\NewUserRegistered;
+use Illuminate\Support\Facades\Notification;
+
 class AuthController extends Controller
 {
     // --- LOGIN ---
 
-    // Show the login form
     public function showLogin()
     {
         return view('auth.login');
     }
 
-    // Process the login form
     public function login(Request $request)
     {
         // 1. Validate Input
@@ -26,19 +28,29 @@ class AuthController extends Controller
             'password' => ['required'],
         ]);
 
-        // 2. Attempt to log the user in
-        if (Auth::attempt($credentials)) {
+        // 2. Attempt Login
+        if (Auth::attempt($credentials)) 
+        {
+            $user = Auth::user();
+
+            // --- BLOCK USERS WHO ARE NOT APPROVED ---
+            if ($user->role !== 'admin' && $user->is_active == 0) {
+                Auth::logout();
+                return back()->withErrors([
+                    'email' => 'Your account is pending approval by Admin.'
+                ]);
+            }
+
             $request->session()->regenerate();
 
             // Redirect based on role
-            $user = Auth::user();
-            if ($user->role === 'admin') return redirect()->route('admin.dashboard');
-            if ($user->role === 'vendor') return redirect()->route('vendor.dashboard');
+            if ($user->role === 'admin')   return redirect()->route('admin.dashboard');
+            if ($user->role === 'vendor')  return redirect()->route('vendor.dashboard');
 
-            return redirect()->intended('/');
+            return redirect('/');
         }
 
-        // 3. If failed, go back with error
+        // 3. Failed Login
         return back()->withErrors([
             'email' => 'The provided credentials do not match our records.',
         ])->onlyInput('email');
@@ -46,37 +58,41 @@ class AuthController extends Controller
 
     // --- REGISTER ---
 
-    // Show the registration form
     public function showRegister()
     {
         return view('auth.register');
     }
 
-    // Process the registration
     public function register(Request $request)
     {
-        // 1. Validate Input
+        // Validation
         $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:8|confirmed', // expects password_confirmation field
-            'role' => 'required|in:customer,vendor'
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users',
+            'password' => 'required|min:8|confirmed',
+            'role'     => 'required|in:customer,vendor'
         ]);
 
-        // 2. Create User
+        // Create User
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
+            'name'     => $request->name,
+            'email'    => $request->email,
             'password' => Hash::make($request->password),
-            'role' => $request->role,
+            'role'     => $request->role,
+            'is_active'=> 0, // NEW users must be approved first
         ]);
 
-        // 3. Log them in immediately
-        Auth::login($user);
+        // --- NEW FEATURE: Notify Admins ---
+        $admins = User::where('role', 'admin')->get();
+        Notification::send($admins, new NewUserRegistered($user));
 
-        // 4. Redirect
-        if ($user->role === 'vendor') return redirect()->route('vendor.dashboard');
-        return redirect('/');
+        // Log the user in
+        //Auth::login($user);
+
+        // Redirect Based on Role
+       // if ($user->role === 'vendor') return redirect()->route('vendor.dashboard');
+return redirect()->route('login')->with('success', 'Account created. Please login.');
+       // return redirect('/');
     }
 
     // --- LOGOUT ---

@@ -14,12 +14,10 @@ class AdminController extends Controller
      */
     public function dashboard()
     {
-        // Security Check (Best done in Middleware, but shown here for logic clarity)
         if (Auth::user()->role !== 'admin') {
             abort(403, 'Unauthorized action.');
         }
 
-        // Gather system-wide statistics
         $stats = [
             'total_users'    => User::count(),
             'total_vendors'  => User::where('role', 'vendor')->count(),
@@ -31,7 +29,7 @@ class AdminController extends Controller
     }
 
     /**
-     * Manage Users (e.g., View all users).
+     * Manage Users.
      */
     public function users()
     {
@@ -39,16 +37,17 @@ class AdminController extends Controller
             abort(403);
         }
 
-        $users = User::paginate(10); // Pagination for better performance
+        $users = User::paginate(10);
         return view('admin.users', compact('users'));
     }
 
+    /**
+     * Manage Products.
+     */
     public function products()
     {
-        // specific admin check
         if (Auth::user()->role !== 'admin') { abort(403); }
 
-        // 'with' eager loads the vendor data to avoid N+1 query performance issues
         $products = Product::with('vendor')->latest()->paginate(10);
 
         return view('admin.products', compact('products'));
@@ -63,7 +62,6 @@ class AdminController extends Controller
 
         $product = Product::findOrFail($id);
 
-        // Optional: Delete the image file to save server space
         if ($product->image && \Storage::disk('public')->exists($product->image)) {
             \Storage::disk('public')->delete($product->image);
         }
@@ -71,5 +69,24 @@ class AdminController extends Controller
         $product->delete();
 
         return redirect()->back()->with('success', 'Product removed successfully.');
+    }
+
+
+    /**
+     * NEW: Toggle User Login Status (Active/Inactive)
+     */
+    public function toggleStatus($id)
+    {
+        if (Auth::user()->role !== 'admin') abort(403);
+
+        $user = User::findOrFail($id);
+
+        $user->is_active = !$user->is_active; // Switch between 1 & 0
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'status' => $user->is_active ? 'Active' : 'Inactive'
+        ]);
     }
 }
