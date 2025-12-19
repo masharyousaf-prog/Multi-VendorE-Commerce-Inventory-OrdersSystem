@@ -6,7 +6,7 @@
 @if($cartItems->isEmpty())
     <div class="alert alert-warning mt-4">Your cart is empty. <a href="{{ url('/') }}">Go Shopping</a></div>
 @else
-    <table class="table table-bordered mt-4 bg-white">
+    <table class="table table-bordered mt-4 bg-white align-middle">
         <thead>
             <tr>
                 <th>Product</th>
@@ -22,12 +22,31 @@
                 <td>
                     <strong>{{ $item->product->name }}</strong>
                 </td>
-                <td>${{ number_format($item->product->price, 2) }}</td>
+
+                {{-- 1. UPDATED PRICE COLUMN --}}
                 <td>
-                    {{-- Simple read-only quantity for now --}}
+                    @if($item->product->discount > 0)
+                        {{-- Show Discounted Price --}}
+                        <span class="text-danger fw-bold">${{ number_format($item->product->final_price, 2) }}</span>
+                        <div class="small">
+                            <span class="text-muted text-decoration-line-through">${{ number_format($item->product->price, 2) }}</span>
+                            <span class="badge bg-danger"> -{{ $item->product->discount }}% </span>
+                        </div>
+                    @else
+                        {{-- Show Regular Price --}}
+                        ${{ number_format($item->product->price, 2) }}
+                    @endif
+                </td>
+
+                <td>
                     {{ $item->quantity }}
                 </td>
-                <td>${{ number_format($item->product->price * $item->quantity, 2) }}</td>
+
+                {{-- 2. UPDATED ROW TOTAL COLUMN (Uses final_price) --}}
+                <td>
+                    ${{ number_format($item->product->final_price * $item->quantity, 2) }}
+                </td>
+
                 <td>
                     <form action="{{ route('cart.remove', $item->id) }}" method="POST" style="display:inline;">
                         @csrf
@@ -41,6 +60,7 @@
         <tfoot>
             <tr>
                 <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
+                {{-- Ensure your Controller calculates $total using final_price too! --}}
                 <td colspan="2"><strong>${{ number_format($total, 2) }}</strong></td>
             </tr>
         </tfoot>

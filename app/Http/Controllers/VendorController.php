@@ -56,6 +56,7 @@ class VendorController extends Controller
             'name'        => 'required|string|max:255',
             'price'       => 'required|numeric|min:0',
             'stock'       => 'required|integer|min:0',
+            'discount' => 'nullable|integer|min:0|max:99',
             'description' => 'nullable|string',
             'image'       => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Max 2MB
         ]);
@@ -73,6 +74,7 @@ class VendorController extends Controller
             'name'        => $request->name,
             'price'       => $request->price,
             'stock'       => $request->stock,
+            'discount' => $request->discount ?? 0,
             'description' => $request->description,
             'image'       => $imagePath, // Save the path (e.g., "products/filename.jpg")
         ]);

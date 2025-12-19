@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Product;
+use App\Models\Order;
+use App\Models\OrderItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,17 +19,17 @@ class CartController extends Controller
     {
         $cart = $this->getCart();
 
-        // If no cart exists yet, pass an empty collection or null
+        // If no cart exists yet, pass an empty collection
         $cartItems = $cart ? $cart->items()->with('product')->get() : collect();
 
-        // Calculate total
+        // Calculate total using FINAL PRICE (which includes discount)
         $total = $cartItems->sum(function($item) {
-            return $item->quantity * $item->product->price;
+            // CHANGE THIS LINE: Use final_price instead of price
+            return $item->quantity * $item->product->final_price;
         });
 
         return view('cart.index', compact('cartItems', 'total'));
     }
-
     /**
      * Add Item to Cart.
      */
@@ -108,7 +110,13 @@ class CartController extends Controller
             return redirect('/cart')->with('error', 'Your cart is empty.');
         }
 
-        return view('cart.checkout', compact('cart'));
+        // Calculate total using final_price (Discounted Price)
+        $total = $cart->items->sum(function($item) {
+            // Use final_price here, NOT price
+            return $item->quantity * $item->product->final_price;
+        });
+
+        return view('cart.checkout', compact('cart','total'));
     }
 
     public function placeOrder(Request $request)
@@ -126,23 +134,45 @@ class CartController extends Controller
             return redirect()->back()->with('error', 'Cart is empty!');
         }
 
-        // 2. REDUCE STOCK (The Missing Logic)
-        // We loop through each item in the cart
+        // --- NEW SECTION: Create the Main Order Record ---
+        // Calculate total based on final_price (including discounts)
+        $totalAmount = $cart->items->sum(function($item) {
+            return $item->product->final_price * $item->quantity;
+        });
+
+        // Save to 'orders' table
+        $order = Order::create([
+            'user_id' => Auth::id(),
+            'total_amount' => $totalAmount
+        ]);
+        // ------------------------------------------------
+
+        // 2. Loop Items: Reduce Stock AND Save History
         foreach ($cart->items as $item) {
             $product = $item->product;
 
-            // Check if we actually have enough stock before subtracting
+            // Check stock
             if ($product->stock >= $item->quantity) {
-                // specific Laravel helper that subtracts X from the column
+
+                // --- NEW SECTION: Save Item to Order History ---
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_name' => $product->name,      // Snapshot of name
+                    'price' => $product->final_price,      // Snapshot of price PAID
+                    'quantity' => $item->quantity,
+                    'discount_applied' => $product->discount ?? 0
+                ]);
+                // -----------------------------------------------
+
+                // Reduce Stock
                 $product->decrement('stock', $item->quantity);
+
             } else {
-                // Optional: Stop the order if someone bought the item while you were browsing
                 return redirect()->back()->with('error', 'Sorry, ' . $product->name . ' is now out of stock.');
             }
         }
 
         // 3. Clear the Cart
-        // Now that stock is updated, we can remove items from the cart
         $cart->items()->delete();
 
         return redirect('/')->with('success', 'Order placed successfully! Thank you for shopping.');
