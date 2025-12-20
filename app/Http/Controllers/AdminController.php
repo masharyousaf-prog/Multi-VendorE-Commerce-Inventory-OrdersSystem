@@ -8,6 +8,8 @@ use App\Models\OrderItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Notifications\ProductDeletedNotification;
 
 class AdminController extends Controller
 {
@@ -76,11 +78,16 @@ class AdminController extends Controller
 
         $product = Product::findOrFail($id);
 
-        if ($product->image && \Storage::disk('public')->exists($product->image)) {
-            \Storage::disk('public')->delete($product->image);
-        }
+        $productName = $product->name; // Save name before deletion
+        $vendor = $product->vendor;
+
+        
 
         $product->delete();
+
+        if ($vendor) {
+            $vendor->notify(new ProductDeletedNotification($productName, 'Soft Deleted'));
+        }
 
         return redirect()->back()->with('success', 'Product removed successfully.');
     }
@@ -210,5 +217,58 @@ class AdminController extends Controller
 
         return $vendors;
 
+    }
+
+
+    /**
+     * Display Trash Can (Soft Deleted Products).
+     */
+    public function trashedProducts()
+    {
+        if (Auth::user()->role !== 'admin') { abort(403); }
+
+        // Fetch ONLY deleted items
+        $trashedProducts = Product::onlyTrashed()->with('vendor')->paginate(10);
+
+        return view('admin.products.trashed', compact('trashedProducts'));
+    }
+
+    /**
+     * Restore a soft-deleted product.
+     */
+    public function restoreProduct($id)
+    {
+        if (Auth::user()->role !== 'admin') { abort(403); }
+
+        $product = Product::onlyTrashed()->findOrFail($id);
+        $product->restore(); // <--- Brings it back!
+
+        return redirect()->back()->with('success', 'Product restored successfully.');
+    }
+
+    /**
+     * Permanently delete a product.
+     */
+    public function forceDeleteProduct($id)
+    {
+        if (Auth::user()->role !== 'admin') { abort(403); }
+
+        $product = Product::onlyTrashed()->findOrFail($id);
+
+        $productName = $product->name;
+        $vendor = $product->vendor;
+
+        // Delete image from storage if exists
+        if ($product->image && \Storage::disk('public')->exists($product->image)) {
+            \Storage::disk('public')->delete($product->image);
+        }
+
+        $product->forceDelete(); // <--- GONE FOREVER
+
+        if ($vendor) {
+            $vendor->notify(new ProductDeletedNotification($productName, 'Permanently Deleted'));
+        }
+
+        return redirect()->back()->with('success', 'Product permanently deleted.');
     }
 }

@@ -16,11 +16,24 @@
                         <input type="text" name="name" class="form-control" value="{{ $product->name }}" required>
                     </div>
 
-                    {{-- Current Image Preview --}}
+                    {{-- 🖼️ Current Image Preview with Smart Logic --}}
                     @if($product->image)
-                        <div class="mb-2">
-                            <label>Current Image:</label><br>
-                            <img src="{{ asset('storage/' . $product->image) }}" width="100">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Current Image:</label><br>
+
+                            @php
+                                $imageUrl = '';
+                                if (str_starts_with($product->image, 'http')) {
+                                    $imageUrl = $product->image;
+                                } else {
+                                    $imageUrl = asset('storage/' . $product->image);
+                                }
+                            @endphp
+
+                            <img src="{{ $imageUrl }}"
+                                 width="150"
+                                 class="rounded border shadow-sm"
+                                 alt="Current Product Image">
                         </div>
                     @endif
 
@@ -42,7 +55,8 @@
 
                     <div class="mb-3">
                         <label class="form-label">Discount Percentage (%)</label>
-                        <input type="number" name="discount" class="form-control" min="0" max="100" value="0">
+                        {{-- Added logic to handle null discount value --}}
+                        <input type="number" name="discount" class="form-control" min="0" max="100" value="{{ $product->discount ?? 0 }}">
                         <small class="text-muted">Enter 0 for no discount. Example: Enter 20 for 20% Off.</small>
                     </div>
 
@@ -51,8 +65,10 @@
                         <textarea name="description" class="form-control" rows="3">{{ $product->description }}</textarea>
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Update Product</button>
-                    <a href="{{ route('vendor.dashboard') }}" class="btn btn-secondary">Cancel</a>
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ route('vendor.dashboard') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Update Product</button>
+                    </div>
                 </form>
             </div>
         </div>

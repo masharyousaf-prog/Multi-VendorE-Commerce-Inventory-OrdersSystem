@@ -5,7 +5,21 @@
     <div class="row">
         {{-- Product Image Section --}}
         <div class="col-md-6 mb-4">
-            <img src="{{ $product->image ? asset('storage/' . $product->image) : 'https://via.placeholder.com/300' }}" class="img-fluid rounded shadow-sm" alt="{{ $product->name }}">
+            {{-- 🖼️ SMART IMAGE LOGIC START --}}
+            @php
+                $imageUrl = 'https://via.placeholder.com/400?text=No+Image';
+
+                if ($product->image) {
+                    if (str_starts_with($product->image, 'http')) {
+                        $imageUrl = $product->image;
+                    } else {
+                        $imageUrl = asset('storage/' . $product->image);
+                    }
+                }
+            @endphp
+
+            <img src="{{ $imageUrl }}" class="img-fluid rounded shadow-sm" alt="{{ $product->name }}">
+            {{-- 🖼️ SMART IMAGE LOGIC END --}}
         </div>
 
         {{-- Product Details Section --}}
@@ -45,8 +59,19 @@
                         <input type="number" name="quantity" id="quantity" class="form-control" value="1" min="1" max="{{ $product->stock }}" style="width: 80px;">
                     </div>
                     <div class="col-auto">
-                        <button type="submit" class="btn btn-dark" {{ $product->stock == 0 ? 'disabled' : '' }}>
-                            Add to Cart
+                        <button type="submit" class="btn btn-dark"
+                            {{-- DISABLE IF: Out of Stock OR Guest OR Admin/Vendor --}}
+                            {{ ($product->stock == 0 || !Auth::check() || (Auth::user()->role == 'admin' || Auth::user()->role == 'vendor')) ? 'disabled' : '' }}>
+
+                            @if(!Auth::check())
+                                Login to Buy
+                            @elseif(Auth::user()->role == 'admin' || Auth::user()->role == 'vendor')
+                                Customer Only
+                            @elseif($product->stock == 0)
+                                Out of Stock
+                            @else
+                                Add to Cart
+                            @endif
                         </button>
                     </div>
                 </div>

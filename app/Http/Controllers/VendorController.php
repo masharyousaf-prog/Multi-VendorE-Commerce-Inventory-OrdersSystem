@@ -19,20 +19,33 @@ class VendorController extends Controller
         }
 
         $vendorId = Auth::id();
-
+        $query = Product::where('user_id', $vendorId);
         // Get products specific to THIS vendor
-        $myProducts = Product::where('user_id', $vendorId)->get();
-
+        // $myProducts = Product::where('user_id', $vendorId)->get();
+        $allProducts = $query->get();
         // Total stock value
-        $totalStockValue = Product::where('user_id', $vendorId)
-                              ->sum(DB::raw('price * stock'));
-
-        //PREPARE CHART DATA (New)
+        // $totalStockValue = Product::where('user_id', $vendorId)
+        //                    ->sum(DB::raw('price * stock'));
+        $totalStockValue = $allProducts->sum(function ($product) {
+            return $product->price * $product->stock;
+        });
+        // PREPARE CHART DATA (New)
         // We need two simple arrays: one for labels ("Shirt", "Shoes") and one for numbers (10, 5)
-        $chartLabels = $myProducts->pluck('name'); // List of names
-        $chartData   = $myProducts->pluck('stock'); // List of stock quantities
+        $chartLabels = $allProducts->pluck('name'); // List of names
+        $chartData = $allProducts->pluck('stock'); // List of stock quantities
 
-        return view('vendor.dashboard', compact('myProducts', 'totalStockValue','chartLabels','chartData'));
+        $myProducts = Product::where('user_id', $vendorId)
+            ->latest()
+            ->paginate(10);
+
+        $deletedProducts = Product::onlyTrashed()
+            ->where('user_id', $vendorId)
+            ->latest()
+            ->get();
+
+        $notifications = Auth::user()->unreadNotifications;
+        // return view('vendor.dashboard', compact('myProducts', 'totalStockValue','chartLabels','chartData'));
+        return view('vendor.dashboard', compact('myProducts', 'totalStockValue', 'chartLabels', 'chartData','notifications'));
     }
 
     /**
@@ -43,6 +56,7 @@ class VendorController extends Controller
         if (Auth::user()->role !== 'vendor') {
             abort(403);
         }
+
         return view('vendor.products.create');
     }
 
@@ -53,12 +67,12 @@ class VendorController extends Controller
     {
         // 1. Validate
         $request->validate([
-            'name'        => 'required|string|max:255',
-            'price'       => 'required|numeric|min:0',
-            'stock'       => 'required|integer|min:0',
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'stock' => 'required|integer|min:0',
             'discount' => 'nullable|integer|min:0|max:99',
             'description' => 'nullable|string',
-            'image'       => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Max 2MB
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Max 2MB
         ]);
 
         // 2. Handle Image Upload
@@ -70,13 +84,13 @@ class VendorController extends Controller
 
         // 3. Create Product
         Product::create([
-            'user_id'     => Auth::id(),
-            'name'        => $request->name,
-            'price'       => $request->price,
-            'stock'       => $request->stock,
+            'user_id' => Auth::id(),
+            'name' => $request->name,
+            'price' => $request->price,
+            'stock' => $request->stock,
             'discount' => $request->discount ?? 0,
             'description' => $request->description,
-            'image'       => $imagePath, // Save the path (e.g., "products/filename.jpg")
+            'image' => $imagePath, // Save the path (e.g., "products/filename.jpg")
         ]);
 
         return redirect()->route('vendor.dashboard')->with('success', 'Product created successfully!');
@@ -101,11 +115,11 @@ class VendorController extends Controller
         $product = Product::where('id', $id)->where('user_id', Auth::id())->firstOrFail();
 
         $request->validate([
-            'name'        => 'required|string|max:255',
-            'price'       => 'required|numeric|min:0',
-            'stock'       => 'required|integer|min:0',
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'stock' => 'required|integer|min:0',
             'description' => 'nullable|string',
-            'image'       => 'nullable|image|max:2048',
+            'image' => 'nullable|image|max:2048',
         ]);
 
         // Handle Image Upload (only if a new one is uploaded)

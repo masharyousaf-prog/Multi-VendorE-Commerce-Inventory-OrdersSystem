@@ -1,16 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
+    {{-- 1. FIX: Added Meta Charset for Special Symbols (★) --}}
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
     <title>Vendor Performance Report</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
+        /* 2. FIX: Ensure DejaVu Sans is used for the star symbol */
         .badge-top-seller {
             font-family: 'DejaVu Sans', sans-serif !important;
             vertical-align: text-bottom;
-            line-height: 1; 
+            line-height: 1;
         }
-        
+
         body { font-family: sans-serif; font-size: 14px; color: #212529; background: #fff; }
         .report-container { width: 100%; max-width: 900px; margin: 0 auto; padding: 20px; }
 
@@ -40,8 +44,18 @@
         @media print {
             .no-print { display: none !important; }
             .report-container { width: 100%; max-width: 100%; padding: 0; }
+
+            /* Reduce whitespace for PDF */
+            .mb-5 { margin-bottom: 1.5rem !important; }
         }
-        .vendor-section { page-break-inside: avoid; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+
+        /* 3. FIX: Removed 'page-break-inside: avoid' */
+        /* This allows long vendor lists to flow naturally to the next page */
+        .vendor-section {
+            margin-bottom: 30px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -64,7 +78,7 @@
             <div class="d-flex gap-2 no-print">
                 <button onclick="window.print()" class="btn btn-outline-secondary">🖨️ Print View</button>
 
-                {{-- IMPORTANT: Pass the 'search' param to the download route --}}
+                {{-- Pass the 'search' param to the download route --}}
                 <a href="{{ route('admin.reports.vendors.download', ['search' => request('search')]) }}" class="btn btn-primary">
                     ⬇️ Download PDF
                 </a>
@@ -124,6 +138,7 @@
                             <td>
                                 {{ $product->name }}
                                 @if($loop->first && $product->total_sold > 0)
+                                    {{-- The font-family DejaVu Sans + the Meta Tag above handles the star --}}
                                     <span class="badge bg-warning ms-1 badge-top-seller">★ Top Seller</span>
                                 @endif
                             </td>

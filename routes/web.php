@@ -57,6 +57,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/vendor/products/{id}/edit', [VendorController::class, 'editProduct']);
     Route::put('/vendor/products/{id}', [VendorController::class, 'updateProduct']);
 
+    Route::post('/vendor/notifications/read', function () {
+    Auth::user()->unreadNotifications->markAsRead();
+    return redirect()->back();
+    })->middleware(['auth'])->name('vendor.notifications.read');
+
     /*
     |--------------------------------------------------------------------------
     | Admin Routes
@@ -78,8 +83,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/admin/reports/vendors', [AdminController::class, 'vendorReport'])->name('admin.reports.vendors');
     Route::get('/admin/reports/vendors/download', [AdminController::class, 'downloadVendorReportPdf'])->name('admin.reports.vendors.download');
 
+    Route::get('/admin/products/trash', [App\Http\Controllers\AdminController::class, 'trashedProducts'])->name('admin.products.trash');
+    Route::post('/admin/products/{id}/restore', [App\Http\Controllers\AdminController::class, 'restoreProduct'])->name('admin.products.restore');
+    Route::delete('/admin/products/{id}/force-delete', [App\Http\Controllers\AdminController::class, 'forceDeleteProduct'])->name('admin.products.forceDelete');
 
-    // ✅ NEW ROUTE: Toggle Vendor/Customer Login Status
+
+    // Toggle Vendor/Customer Login Status
     Route::post('/admin/users/{id}/toggle', [AdminController::class, 'toggleStatus'])
         ->name('admin.users.toggle');
 });

@@ -3,6 +3,11 @@
 @section('admin_content')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Manage Products</h2>
+
+    {{-- NEW BUTTON TO VIEW TRASH --}}
+    <a href="{{ route('admin.products.trash') }}" class="btn btn-outline-danger">
+        <i class="bi bi-trash"></i> View Trash Bin
+    </a>
 </div>
 
 <div class="card shadow-sm">
@@ -22,11 +27,25 @@
                 @forelse($products as $product)
                 <tr>
                     <td>
-                        @if($product->image)
-                            <img src="{{ asset('storage/' . $product->image) }}" width="50" height="50" class="rounded" style="object-fit: cover;">
-                        @else
-                            <span class="text-muted small">No Image</span>
-                        @endif
+                        {{-- 🖼️ SMART IMAGE LOGIC START --}}
+                        @php
+                            $imageUrl = 'https://via.placeholder.com/50?text=No+Img';
+
+                            if ($product->image) {
+                                if (str_starts_with($product->image, 'http')) {
+                                    $imageUrl = $product->image;
+                                } else {
+                                    $imageUrl = asset('storage/' . $product->image);
+                                }
+                            }
+                        @endphp
+
+                        <img src="{{ $imageUrl }}"
+                             width="50"
+                             height="50"
+                             class="rounded shadow-sm"
+                             style="object-fit: cover;">
+                        {{-- 🖼️ SMART IMAGE LOGIC END --}}
                     </td>
                     <td>
                         <strong>{{ $product->name }}</strong><br>
@@ -45,10 +64,12 @@
                         @endif
                     </td>
                     <td>
-                        <form action="{{ route('admin.products.delete', $product->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this product? This cannot be undone.');">
+                        <form action="{{ route('admin.products.delete', $product->id) }}" method="POST">
                             @csrf
                             @method('DELETE')
-                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            <button type="submit" class="btn btn-sm btn-danger">
+                                <i class="bi bi-archive"></i> Soft Delete
+                            </button>
                         </form>
                     </td>
                 </tr>
@@ -60,6 +81,7 @@
             </tbody>
         </table>
 
+        {{-- Pagination (Kept inside the card for better UI) --}}
         <div class="d-flex justify-content-center mt-3">
             {{ $products->links() }}
         </div>
