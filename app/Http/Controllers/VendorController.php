@@ -119,6 +119,7 @@ class VendorController extends Controller
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'description' => 'nullable|string',
+            'discount' => 'required|integer|min:0|max:100',
             'image' => 'nullable|image|max:2048',
         ]);
 
@@ -133,6 +134,7 @@ class VendorController extends Controller
         $product->price = $request->price;
         $product->stock = $request->stock;
         $product->description = $request->description;
+        $product->discount = $request->discount;
         $product->save();
 
         return redirect()->route('vendor.dashboard')->with('success', 'Product updated successfully!');
