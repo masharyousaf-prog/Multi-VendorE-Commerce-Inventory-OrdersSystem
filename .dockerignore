@@ -1,0 +1,9 @@
+# Ignore dependencies (CRITICAL: prevents Windows vs Linux crashes)
+/vendor
+/node_modules
+
+# Ignore storage (Prevents permission errors)
+/storage/*.key
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
