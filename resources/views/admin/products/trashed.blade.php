@@ -1,65 +1,46 @@
-@extends('layouts.admin')
+{{-- resources/views/admin/products/trashed.blade.php --}}
+@extends('layouts.app')
 
-@section('admin_content')
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-trash"></i> Deleted Products (Trash)</h2>
-    <a href="{{ route('admin.products') }}" class="btn btn-secondary">
-        <i class="bi bi-arrow-left"></i> Back to Products
-    </a>
-</div>
+@section('content')
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-extrabold text-rose-400"><i class="fa-solid fa-recycle mr-2"></i>Soft-Deleted Products Vault</h1>
+        <a href="{{ route('admin.products') }}" class="px-4 py-2 rounded-xl glass-panel text-xs font-bold">Back to Active Products</a>
+    </div>
 
-<div class="card shadow-sm border-danger">
-    <div class="card-body">
-        <table class="table table-hover align-middle">
-            <thead class="table-danger">
-                <tr>
-                    <th>Product</th>
-                    <th>Vendor</th>
-                    <th>Deleted At</th>
-                    <th>Actions</th>
+    <div class="glass-panel rounded-3xl overflow-hidden">
+        <table class="w-full text-left text-xs">
+            <thead>
+                <tr class="border-b border-slate-500/20 bg-slate-800/30 uppercase text-[10px]">
+                    <th class="p-4">Product</th>
+                    <th class="p-4">Vendor</th>
+                    <th class="p-4">Deleted At</th>
+                    <th class="p-4 text-right">Recovery Actions</th>
                 </tr>
             </thead>
-            <tbody>
-                @forelse($trashedProducts as $product)
-                <tr>
-                    <td>
-                        <strong>{{ $product->name }}</strong><br>
-                        <small class="text-muted">ID: {{ $product->id }}</small>
-                    </td>
-                    <td>{{ $product->vendor->name ?? 'Unknown' }}</td>
-                    <td>{{ $product->deleted_at->diffForHumans() }}</td>
-                    <td>
-                        <div class="d-flex gap-2">
-                            {{-- RESTORE BUTTON --}}
-                            <form action="{{ route('admin.products.restore', $product->id) }}" method="POST">
+            <tbody class="divide-y divide-slate-500/15">
+                @forelse($products as $product)
+                    <tr>
+                        <td class="p-4 font-bold">{{ $product->name }}</td>
+                        <td class="p-4">{{ $product->vendor->name ?? 'Vendor' }}</td>
+                        <td class="p-4 opacity-70">{{ $product->deleted_at->diffForHumans() }}</td>
+                        <td class="p-4 text-right space-x-2">
+                            <form method="POST" action="{{ route('admin.products.restore', $product->id) }}" class="inline">
                                 @csrf
-                                <button type="submit" class="btn btn-sm btn-success">
-                                    <i class="bi bi-arrow-counterclockwise"></i> Restore
-                                </button>
+                                <button type="submit" class="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-400 font-bold">Restore</button>
                             </form>
-
-                            {{-- PERMANENT DELETE BUTTON --}}
-                            <form action="{{ route('admin.products.forceDelete', $product->id) }}" method="POST" onsubmit="return confirm('WARNING: This will permanently erase the product. Continue?');">
+                            <form method="POST" action="{{ route('admin.products.forceDelete', $product->id) }}" class="inline">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-danger">
-                                    <i class="bi bi-x-circle"></i> Delete Forever
-                                </button>
+                                <button type="submit" class="px-3 py-1.5 rounded-xl bg-rose-600 text-white font-bold">Purge Forever</button>
                             </form>
-                        </div>
-                    </td>
-                </tr>
+                        </td>
+                    </tr>
                 @empty
-                <tr>
-                    <td colspan="4" class="text-center py-4">Trash is empty.</td>
-                </tr>
+                    <tr><td colspan="4" class="p-8 text-center opacity-60">Trash vault is empty.</td></tr>
                 @endforelse
             </tbody>
         </table>
-
-        <div class="d-flex justify-content-center mt-3">
-            {{ $trashedProducts->links() }}
-        </div>
     </div>
 </div>
 @endsection

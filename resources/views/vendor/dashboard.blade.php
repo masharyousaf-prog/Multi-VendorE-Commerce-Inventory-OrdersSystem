@@ -1,163 +1,87 @@
-@extends('layouts.vendor')
+@extends('layouts.app')
 
-@section('vendor_content')
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>My Vendor Dashboard</h2>
-        <a href="{{ url('/vendor/products/create') }}" class="btn btn-success">Add New Product</a>
-    </div>
-
-    {{-- 🔔 NOTIFICATIONS ALERT --}}
-    @if(isset($notifications) && $notifications->count() > 0)
-        <div class="alert alert-warning alert-dismissible fade show" role="alert">
-            <h5 class="alert-heading"><i class="bi bi-bell-fill"></i> Admin Notifications</h5>
-            <ul class="mb-2">
-                @foreach($notifications as $notification)
-                    <li>
-                        {{-- Shows: "Your product 'XYZ' was Permanently Deleted..." --}}
-                        {{ $notification->data['message'] }}
-                        <span class="text-muted small">({{ $notification->created_at->diffForHumans() }})</span>
-                    </li>
-                @endforeach
-            </ul>
-
-            {{-- Form to Mark as Read (Clears the alert) --}}
-            <form action="{{ route('vendor.notifications.read') }}" method="POST">
-                @csrf
-                <button type="submit" class="btn btn-sm btn-outline-dark">Mark all as Read</button>
-            </form>
-
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+@section('content')
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+            <span class="text-xs font-bold uppercase tracking-widest text-orange-400">Seller Central</span>
+            <h1 class="text-3xl font-extrabold">{{ $vendor->store_name ?? $vendor->name . ' Storefront' }}</h1>
         </div>
-    @endif
-
-    <div class="alert alert-info">
-        <strong>Total Inventory Value:</strong> ${{ number_format($totalStockValue, 2) }}
+        <a href="{{ route('vendor.products.create') }}" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-pink-600 text-white text-xs font-extrabold shadow-lg hover:scale-105 transition">
+            <i class="fa-solid fa-plus mr-1"></i> Add New Product
+        </a>
     </div>
 
-    <h3>My Products</h3>
-    <table class="table table-bordered align-middle">
-        <thead class="table-light">
-            <tr>
-                <th style="width: 80px;">Image</th>
-                <th>Product Name</th>
-                <th>Price</th> {{-- Updated Column --}}
-                <th>Stock</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($myProducts as $product)
-                <tr>
-                    {{-- 🖼️ Image Column --}}
-                    <td>
-                        @php
-                            $imageUrl = 'https://via.placeholder.com/50?text=No+Img';
-
-                            if ($product->image) {
-                                if (str_starts_with($product->image, 'http')) {
-                                    $imageUrl = $product->image;
-                                } else {
-                                    $imageUrl = asset('storage/' . $product->image);
-                                }
-                            }
-                        @endphp
-
-                        <img src="{{ $imageUrl }}"
-                             alt="{{ $product->name }}"
-                             class="rounded border"
-                             style="width: 50px; height: 50px; object-fit: cover;">
-                    </td>
-
-                    <td>{{ $product->name }}</td>
-
-                    {{-- 💲 PRICE COLUMN WITH DISCOUNT LOGIC --}}
-                    <td>
-                        @if($product->discount > 0)
-                            <div class="d-flex flex-column">
-                                <span class="text-danger fw-bold">
-                                    ${{ number_format($product->final_price, 2) }}
-                                </span>
-                                <small class="text-muted text-decoration-line-through">
-                                    ${{ number_format($product->price, 2) }}
-                                </small>
-                                <span class="badge bg-danger mt-1" style="width: fit-content;">
-                                    -{{ $product->discount }}%
-                                </span>
-                            </div>
-                        @else
-                            <span class="fw-bold">${{ number_format($product->price, 2) }}</span>
-                        @endif
-                    </td>
-
-                    <td>
-                        @if($product->stock > 0)
-                            <span class="text-success">{{ $product->stock }}</span>
-                        @else
-                            <span class="text-danger fw-bold">Out of Stock</span>
-                        @endif
-                    </td>
-                    <td>
-                        <a href="{{ url('/vendor/products/' . $product->id . '/edit') }}"
-                            class="btn btn-sm btn-primary">Edit</a>
-                    </td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="5" class="text-center">You haven't added any products yet.</td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
-
-    {{-- Inventory Chart --}}
-    <div class="row mb-5 mt-4">
-        <div class="col-md-8 offset-md-2">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h4 class="card-title text-center text-muted mb-3">Inventory Stock Levels</h4>
-                    <canvas id="myStockChart"></canvas>
-                </div>
-            </div>
+    <!-- Vendor KPIs -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div data-tilt class="glass-panel rounded-2xl p-5">
+            <div class="text-xs opacity-65">Gross Sales</div>
+            <div class="text-2xl font-extrabold text-emerald-400 mt-1">${{ number_format($grossEarnings, 2) }}</div>
+        </div>
+        <div data-tilt class="glass-panel rounded-2xl p-5">
+            <div class="text-xs opacity-65">Net Payout (After {{ $vendor->commission_rate ?? 10 }}% Fee)</div>
+            <div class="text-2xl font-extrabold text-indigo-400 mt-1">${{ number_format($netEarnings, 2) }}</div>
+        </div>
+        <div data-tilt class="glass-panel rounded-2xl p-5">
+            <div class="text-xs opacity-65">Total Units Sold</div>
+            <div class="text-2xl font-extrabold text-orange-400 mt-1">{{ number_format($totalUnitsSold) }}</div>
+        </div>
+        <div data-tilt class="glass-panel rounded-2xl p-5">
+            <div class="text-xs opacity-65">Low Stock Alerts (≤ 5)</div>
+            <div class="text-2xl font-extrabold text-rose-400 mt-1">{{ $lowStockCount }} SKUs</div>
         </div>
     </div>
 
-    {{-- Pagination --}}
-    <div class="d-flex justify-content-center mt-3 mb-5">
-        {{ $myProducts->links() }}
+    <!-- Multi-Graph Vendor Analytics -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-6 glass-panel rounded-3xl p-6">
+            <h3 class="font-extrabold text-base mb-4">14-Day Store Earnings & Units</h3>
+            <div id="vendorSalesChart" class="h-72"></div>
+        </div>
+        <div class="lg:col-span-3 glass-panel rounded-3xl p-6">
+            <h3 class="font-extrabold text-base mb-4">Top SKUs by Revenue</h3>
+            <div id="vendorTopProductsChart" class="h-72"></div>
+        </div>
+        <div class="lg:col-span-3 glass-panel rounded-3xl p-6">
+            <h3 class="font-extrabold text-base mb-4">Inventory Health</h3>
+            <div id="vendorStockChart" class="h-72"></div>
+        </div>
     </div>
+</div>
 
-    {{-- Chart Scripts --}}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        const ctx = document.getElementById('myStockChart').getContext('2d');
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const theme = { mode: 'dark' };
 
-        const productNames = @json($chartLabels);
-        const productStock = @json($chartData);
+    new ApexCharts(document.querySelector("#vendorSalesChart"), {
+        chart: { height: 280, type: 'area', background: 'transparent' },
+        series: [
+            { name: 'Revenue ($)', data: @json($chartRevenue) },
+            { name: 'Units Sold', data: @json($chartUnits) }
+        ],
+        xaxis: { categories: @json($chartLabels) },
+        colors: ['#10b981', '#6366f1'],
+        stroke: { curve: 'smooth', width: 3 },
+        theme
+    }).render();
 
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: productNames,
-                datasets: [{
-                    label: 'Stock Quantity',
-                    data: productStock,
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Units in Stock'
-                        }
-                    }
-                }
-            }
-        });
-    </script>
+    new ApexCharts(document.querySelector("#vendorTopProductsChart"), {
+        chart: { height: 280, type: 'bar', background: 'transparent' },
+        plotOptions: { bar: { horizontal: true, borderRadius: 5 } },
+        series: [{ name: 'Revenue ($)', data: @json($topProducts->pluck('revenue')->map(fn($v) => (float)$v)) }],
+        xaxis: { categories: @json($topProducts->map(fn($p) => \Illuminate\Support\Str::limit($p->product->name ?? 'SKU', 16))) },
+        colors: ['#f97316'],
+        theme
+    }).render();
+
+    new ApexCharts(document.querySelector("#vendorStockChart"), {
+        chart: { height: 280, type: 'donut', background: 'transparent' },
+        series: @json(array_values($stockHealth)),
+        labels: @json(array_keys($stockHealth)),
+        colors: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'],
+        legend: { position: 'bottom' },
+        theme
+    }).render();
+});
+</script>
 @endsection

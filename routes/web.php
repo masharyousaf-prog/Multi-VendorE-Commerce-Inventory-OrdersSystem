@@ -1,94 +1,53 @@
 <?php
 
-use App\Http\Controllers\ProductController;
-use App\Http\Controllers\CartController;
-use App\Http\Controllers\VendorController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CartController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\VendorController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Public Routes
-|--------------------------------------------------------------------------
-*/
+// Public Storefront & Discovery Routes
+Route::get('/', [ProductController::class, 'index'])->name('products.index');
+Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
+Route::get('/store/{slug}', [ProductController::class, 'vendorStore'])->name('vendor.store');
 
-Route::get('/', [ProductController::class, 'index']);
-Route::get('/products/{id}', [ProductController::class, 'show']);
-
-Route::get('/cart', [CartController::class, 'index']);
-Route::post('/cart/add', [CartController::class, 'addToCart']);
-Route::delete('/cart/remove/{id}', [CartController::class, 'removeItem'])->name('cart.remove');
-
-Route::get('/checkout', [CartController::class, 'checkout'])->name('checkout');
-Route::post('/checkout', [CartController::class, 'placeOrder'])->name('checkout.place');
-
-/*
-|--------------------------------------------------------------------------
-| Authentication Routes
-|--------------------------------------------------------------------------
-*/
-
+// Guest Auth Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
-
 Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
 Route::post('/register', [AuthController::class, 'register']);
-
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-/*
-|--------------------------------------------------------------------------
-| Protected Routes (Authenticated Users)
-|--------------------------------------------------------------------------
-*/
+// Authenticated Customer Routes (JWT Protected)
+Route::middleware(['jwt.auth:customer,vendor,admin'])->group(function () {
+    Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+    Route::post('/cart/add/{product}', [CartController::class, 'add'])->name('cart.add');
+    Route::patch('/cart/update/{item}', [CartController::class, 'update'])->name('cart.update');
+    Route::delete('/cart/remove/{item}', [CartController::class, 'remove'])->name('cart.remove');
+    Route::post('/cart/checkout', [CartController::class, 'checkout'])->name('cart.checkout');
 
-Route::middleware(['auth'])->group(function () {
+    // New Marketplace Features: Wishlist & Verified Reviews
+    Route::post('/products/{product}/wishlist', [ProductController::class, 'toggleWishlist'])->name('products.wishlist');
+    Route::post('/products/{product}/reviews', [ProductController::class, 'storeReview'])->name('products.reviews.store');
+});
 
-    /*
-    |--------------------------------------------------------------------------
-    | Vendor Routes
-    |--------------------------------------------------------------------------
-    */
+// Vendor Seller Hub Routes (JWT Role: vendor)
+Route::prefix('vendor')->name('vendor.')->middleware(['jwt.auth:vendor'])->group(function () {
+    Route::get('/dashboard', [VendorController::class, 'dashboard'])->name('dashboard');
+    Route::get('/products/create', [VendorController::class, 'createProduct'])->name('products.create');
+    Route::post('/products', [VendorController::class, 'storeProduct'])->name('products.store');
+});
 
-    Route::get('/vendor/dashboard', [VendorController::class, 'dashboard'])->name('vendor.dashboard');
-    Route::get('/vendor/products/create', [VendorController::class, 'createProduct']);
-    Route::post('/vendor/products', [VendorController::class, 'storeProduct']);
-    Route::get('/vendor/products/{id}/edit', [VendorController::class, 'editProduct']);
-    Route::put('/vendor/products/{id}', [VendorController::class, 'updateProduct']);
-
-    Route::post('/vendor/notifications/read', function () {
-    Auth::user()->unreadNotifications->markAsRead();
-    return redirect()->back();
-    })->middleware(['auth'])->name('vendor.notifications.read');
-
-    /*
-    |--------------------------------------------------------------------------
-    | Admin Routes
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/admin/console', [AdminController::class, 'dashboard'])->name('admin.dashboard');
-    Route::get('/admin/users', [AdminController::class, 'users'])->name('admin.users');
-    Route::get('/admin/products', [AdminController::class, 'products'])->name('admin.products');
-
-    Route::delete('/admin/products/{id}', [AdminController::class, 'deleteProduct'])
-        ->name('admin.products.delete');
-
-    Route::delete('/admin/products/{id}', [AdminController::class, 'deleteProduct'])->name('admin.products.delete');
-    Route::get('/admin/reports/customers', [AdminController::class, 'customerReport'])->name('admin.reports.customers');
-    Route::get('/admin/reports/customers/download', [AdminController::class, 'downloadCustomerReportPdf'])
-     ->name('admin.reports.customers.download');
-
-    Route::get('/admin/reports/vendors', [AdminController::class, 'vendorReport'])->name('admin.reports.vendors');
-    Route::get('/admin/reports/vendors/download', [AdminController::class, 'downloadVendorReportPdf'])->name('admin.reports.vendors.download');
-
-    Route::get('/admin/products/trash', [App\Http\Controllers\AdminController::class, 'trashedProducts'])->name('admin.products.trash');
-    Route::post('/admin/products/{id}/restore', [App\Http\Controllers\AdminController::class, 'restoreProduct'])->name('admin.products.restore');
-    Route::delete('/admin/products/{id}/force-delete', [App\Http\Controllers\AdminController::class, 'forceDeleteProduct'])->name('admin.products.forceDelete');
-
-
-    // Toggle Vendor/Customer Login Status
-    Route::post('/admin/users/{id}/toggle', [AdminController::class, 'toggleStatus'])
-        ->name('admin.users.toggle');
+// Admin Command Routes (JWT Role: admin — Notification routes removed)
+Route::prefix('admin')->name('admin.')->middleware(['jwt.auth:admin'])->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+    Route::get('/users', [AdminController::class, 'users'])->name('users');
+    Route::patch('/users/{user}/toggle', [AdminController::class, 'toggleUserStatus'])->name('users.toggle');
+    Route::get('/products', [AdminController::class, 'products'])->name('products');
+    Route::delete('/products/{product}', [AdminController::class, 'deleteProduct'])->name('products.delete');
+    Route::get('/products/trashed', [AdminController::class, 'trashedProducts'])->name('products.trashed');
+    Route::post('/products/{id}/restore', [AdminController::class, 'restoreProduct'])->name('products.restore');
+    Route::delete('/products/{id}/force', [AdminController::class, 'forceDeleteProduct'])->name('products.forceDelete');
+    Route::post('/coupons', [AdminController::class, 'storeCoupon'])->name('coupons.store');
 });

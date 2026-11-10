@@ -18,7 +18,11 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->enum('role', ['customer', 'vendor', 'admin'])->default('customer');
-
+            $table->boolean('is_active')->default(true); // Approved by default
+            $table->string('store_name')->nullable();
+            $table->string('store_slug')->nullable()->unique();
+            $table->text('store_description')->nullable();
+            $table->decimal('commission_rate', 5, 2)->default(10.00);
             $table->rememberToken();
             $table->timestamps();
         });

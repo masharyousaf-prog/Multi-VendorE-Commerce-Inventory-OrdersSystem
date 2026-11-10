@@ -2,67 +2,64 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable implements JWTSubject
 {
-    use HasFactory, Notifiable;
+    use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
         'password',
         'role',
         'is_active',
+        'store_name',
+        'store_slug',
+        'store_description',
+        'commission_rate',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
-    protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-    ];
-
-    // --- Relationships ---
-
-    /**
-     * A User (Vendor) can have many Products.
-     */
-    public function products(): HasMany
+    protected function casts(): array
     {
-        // This is for users with the 'vendor' role
-        return $this->hasMany(Product::class);
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'is_active' => 'boolean',
+            'commission_rate' => 'decimal:2',
+        ];
     }
 
     /**
-     * A User (Customer) can have many Carts.
+     * Get the identifier that will be stored in the subject claim of the JWT.
      */
-    public function carts(): HasMany
+    public function getJWTIdentifier(): mixed
     {
-        // This is for users with the 'customer' role
-        return $this->hasMany(Cart::class);
+        return $this->getKey();
+    }
+
+    /**
+     * Return a key value array, containing any custom claims to be added to the JWT.
+     */
+    public function getJWTCustomClaims(): array
+    {
+        return [
+            'role' => $this->role,
+            'is_active' => (bool) $this->is_active,
+            'email' => $this->email,
+        ];
+    }
+
+    public function products()
+    {
+        return $this->hasMany(Product::class, 'vendor_id');
     }
 
     public function orders()
@@ -70,17 +67,13 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Order::class);
     }
 
-    // --- Accessors/Helpers (Optional) ---
-
-    public function isVendor(): bool
+    public function wishlists()
     {
-        return $this->role === 'vendor';
+        return $this->hasMany(Wishlist::class);
     }
 
-    public function isCustomer(): bool
+    public function reviews()
     {
-        return $this->role === 'customer';
+        return $this->hasMany(Review::class);
     }
-   
-
 }

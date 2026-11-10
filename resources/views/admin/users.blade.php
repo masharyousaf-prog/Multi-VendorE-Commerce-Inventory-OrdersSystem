@@ -1,134 +1,69 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container">
-    {{-- Header & Stats --}}
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Manage Users</h2>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-            <span class="badge bg-secondary me-2">{{ $users->total() }} Total Records</span>
-            <a href="{{ route('admin.reports.customers') }}" target="_blank" class="btn btn-sm btn-dark">
-                📄 Print Customer Report
-            </a>
-            <a href="{{ route('admin.reports.vendors') }}" target="_blank" class="btn btn-sm btn-warning ms-2">
-                📄 Print Vendor Report
-            </a>
+            <h1 class="text-2xl font-extrabold">User & Vendor Access Control</h1>
+            <p class="text-xs opacity-70">All new registrations default to Approved (Active) status with JWT role claims.</p>
         </div>
+        <a href="{{ route('admin.dashboard') }}" class="px-4 py-2 rounded-xl glass-panel text-xs font-bold">Back to Dashboard</a>
     </div>
 
-    {{-- Filter Card --}}
-    <div class="card mb-4 shadow-sm">
-        <div class="card-body py-3">
-            <div class="d-flex align-items-center">
-                <strong class="me-3">Filter By Role:</strong>
-                <div class="btn-group" role="group">
-                    <a href="{{ route('admin.users') }}"
-                        class="btn btn-outline-primary {{ !request('role') || request('role') == 'all' ? 'active' : '' }}">
-                        All
-                    </a>
-                    <a href="{{ route('admin.users', ['role' => 'admin']) }}"
-                        class="btn btn-outline-danger {{ request('role') == 'admin' ? 'active' : '' }}">
-                        Admins
-                    </a>
-                    <a href="{{ route('admin.users', ['role' => 'vendor']) }}"
-                        class="btn btn-outline-warning {{ request('role') == 'vendor' ? 'active' : '' }}">
-                        Vendors
-                    </a>
-                    <a href="{{ route('admin.users', ['role' => 'customer']) }}"
-                        class="btn btn-outline-info {{ request('role') == 'customer' ? 'active' : '' }}">
-                        Customers
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Users Table Card --}}
-    <div class="card shadow-sm">
-        <div class="card-body p-0"> {{-- Removed padding for a flush table look --}}
-            <table class="table table-striped table-hover align-middle mb-0">
-                <thead class="table-dark">
-                    <tr>
-                        <th class="ps-3">ID</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Joined</th>
-                        <th class="text-center">Login Approved?</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($users as $user)
-                        <tr>
-                            <td class="ps-3">{{ $user->id }}</td>
-                            <td>{{ $user->name }}</td>
-                            <td>{{ $user->email }}</td>
-                            <td>
-                                <span class="badge bg-{{ 
-                                    $user->role === 'admin' ? 'danger' : 
-                                    ($user->role === 'vendor' ? 'warning text-dark' : 'info text-dark') 
-                                }}">
-                                    {{ ucfirst($user->role) }}
+    <div class="glass-panel rounded-3xl overflow-hidden">
+        <table class="w-full text-left border-collapse text-xs">
+            <thead>
+                <tr class="border-b border-slate-500/20 bg-slate-800/30 uppercase tracking-wider text-[10px]">
+                    <th class="p-4">User / Store</th>
+                    <th class="p-4">Email</th>
+                    <th class="p-4">JWT Role</th>
+                    <th class="p-4">Account Status</th>
+                    <th class="p-4 text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-500/15">
+                @foreach($users as $user)
+                    <tr class="hover:bg-indigo-500/5 transition">
+                        <td class="p-4 font-bold">
+                            {{ $user->name }}
+                            @if($user->store_name)
+                                <span class="block text-[10px] text-orange-400">{{ $user->store_name }}</span>
+                            @endif
+                        </td>
+                        <td class="p-4 opacity-80">{{ $user->email }}</td>
+                        <td class="p-4">
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase
+                                {{ $user->role === 'admin' ? 'bg-purple-500/20 text-purple-400' : ($user->role === 'vendor' ? 'bg-orange-500/20 text-orange-400' : 'bg-cyan-500/20 text-cyan-400') }}">
+                                {{ $user->role }}
+                            </span>
+                        </td>
+                        <td class="p-4">
+                            @if($user->is_active)
+                                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/15 text-emerald-400">
+                                    <i class="fa-solid fa-circle-check mr-1"></i> Approved
                                 </span>
-                            </td>
-                            <td>{{ $user->created_at->format('M d, Y') }}</td>
-                            <td class="text-center">
-                                <div class="form-check form-switch d-inline-block">
-                                    <input 
-                                        class="form-check-input user-status-toggle"
-                                        type="checkbox"
-                                        role="switch"
-                                        data-id="{{ $user->id }}"
-                                        {{ $user->is_active ? 'checked' : '' }}
-                                        {{ $user->role === 'admin' ? 'disabled' : '' }}>
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="text-center py-5">
-                                <h5 class="text-muted">No users found for this filter.</h5>
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+                            @else
+                                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-500/15 text-rose-400">
+                                    <i class="fa-solid fa-ban mr-1"></i> Suspended
+                                </span>
+                            @endif
+                        </td>
+                        <td class="p-4 text-right">
+                            @if($user->role !== 'admin')
+                                <form method="POST" action="{{ route('admin.users.toggle', $user) }}" class="inline">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button type="submit" class="px-3 py-1.5 rounded-xl font-bold text-[11px] {{ $user->is_active ? 'bg-rose-500/15 text-rose-400 hover:bg-rose-600 hover:text-white' : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-600 hover:text-white' }} transition">
+                                        {{ $user->is_active ? 'Suspend' : 'Approve' }}
+                                    </button>
+                                </form>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
     </div>
-
-    {{-- Pagination --}}
-    <div class="d-flex justify-content-center mt-4">
-        {{ $users->appends(['role' => request('role')])->links() }}
-    </div>
+    {{ $users->links() }}
 </div>
-
-{{-- AJAX Script --}}
-<script>
-document.querySelectorAll('.user-status-toggle').forEach(toggle => {
-    toggle.addEventListener('change', function () {
-        let userId = this.dataset.id;
-        let checkbox = this;
-
-        fetch(`/admin/users/${userId}/toggle`, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (!data.success) {
-                alert('Failed to update user status');
-                checkbox.checked = !checkbox.checked;
-            }
-        })
-        .catch(() => {
-            alert('Server error occurred');
-            checkbox.checked = !checkbox.checked;
-        });
-    });
-});
-</script>
 @endsection

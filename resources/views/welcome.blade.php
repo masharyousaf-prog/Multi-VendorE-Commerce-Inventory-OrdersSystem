@@ -275,3 +275,5 @@
         @endif
     </body>
 </html>
+{{-- resources/views/welcome.blade.php --}}
+<script>window.location.href = "{{ route('products.index') }}";</script>

@@ -4,177 +4,113 @@ namespace App\Http\Controllers;
 
 use App\Models\Cart;
 use App\Models\CartItem;
-use App\Models\Product;
+use App\Models\Coupon;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CartController extends Controller
 {
-    /**
-     * View the Cart.
-     */
     public function index()
     {
-        $cart = $this->getCart();
-
-        // If no cart exists yet, pass an empty collection
-        $cartItems = $cart ? $cart->items()->with('product')->get() : collect();
-
-        // Calculate total using FINAL PRICE (which includes discount)
-        $total = $cartItems->sum(function($item) {
-            // CHANGE THIS LINE: Use final_price instead of price
-            return $item->quantity * $item->product->final_price;
-        });
-
-        return view('cart.index', compact('cartItems', 'total'));
+        $cart = Cart::with(['items.product.vendor'])->firstOrCreate(['user_id' => Auth::id()]);
+        return view('cart.index', compact('cart'));
     }
-    /**
-     * Add Item to Cart.
-     */
-    public function addToCart(Request $request)
+
+    public function add(Request $request, Product $product)
     {
-        $request->validate([
-            'product_id' => 'required|exists:products,id',
-            'quantity'   => 'required|integer|min:1'
-        ]);
+        if ($product->stock < 1) {
+            return back()->withErrors(['error' => 'Product is out of stock.']);
+        }
 
-        $product = Product::findOrFail($request->product_id);
-        $cart = $this->getOrCreateCart();
+        $cart = Cart::firstOrCreate(['user_id' => Auth::id()]);
+        $qtyToAdd = max(1, (int) $request->input('quantity', 1));
 
-        // Check if item exists in cart
-        $cartItem = CartItem::where('cart_id', $cart->id)
-                            ->where('product_id', $product->id)
-                            ->first();
-
-        if ($cartItem) {
-            $cartItem->increment('quantity', $request->quantity);
+        $item = CartItem::where('cart_id', $cart->id)->where('product_id', $product->id)->first();
+        if ($item) {
+            $item->update(['quantity' => min($product->stock, $item->quantity + $qtyToAdd)]);
         } else {
             CartItem::create([
-                'cart_id'    => $cart->id,
+                'cart_id' => $cart->id,
                 'product_id' => $product->id,
-                'quantity'   => $request->quantity
+                'quantity' => min($product->stock, $qtyToAdd),
             ]);
         }
 
-        return redirect()->back()->with('success', 'Added to cart!');
+        return redirect()->route('cart.index')->with('success', "{$product->name} added to your cart.");
     }
 
-    /**
-     * Helper: Get existing cart or create a new one.
-     */
-    private function getOrCreateCart()
+    public function update(Request $request, CartItem $item)
     {
-        $user = Auth::user();
-
-        if ($user) {
-            // Logged in user
-            return Cart::firstOrCreate(
-                ['user_id' => $user->id, 'status' => 'active']
-            );
-        } else {
-            // Guest user (using session ID)
-            $sessionId = session()->getId();
-            return Cart::firstOrCreate(
-                ['session_token' => $sessionId, 'status' => 'active']
-            );
-        }
+        $qty = max(1, (int) $request->input('quantity', 1));
+        $item->update(['quantity' => min($item->product->stock, $qty)]);
+        return back()->with('success', 'Cart quantity updated.');
     }
 
-    /**
-     * Helper: Get current cart for viewing.
-     */
-    private function getCart()
+    public function remove(CartItem $item)
     {
-        if (Auth::check()) {
-            return Cart::where('user_id', Auth::id())->where('status', 'active')->first();
-        }
-        return Cart::where('session_token', session()->getId())->where('status', 'active')->first();
+        $item->delete();
+        return back()->with('success', 'Item removed from cart.');
     }
 
-    public function removeItem($id)
+    public function checkout(Request $request)
     {
-        // Find the item and make sure it belongs to the current user's cart (security check)
-        // For simplicity in this lab, we will just find and delete:
-        CartItem::destroy($id);
-
-        return redirect()->back()->with('success', 'Item removed from cart.');
-    }
-
-    public function checkout()
-    {
-        $cart = $this->getCart();
-        // If cart is empty, redirect back
+        $cart = Cart::with('items.product')->where('user_id', Auth::id())->first();
         if (!$cart || $cart->items->isEmpty()) {
-            return redirect('/cart')->with('error', 'Your cart is empty.');
+            return redirect()->route('products.index')->withErrors(['error' => 'Your cart is empty.']);
         }
 
-        // Calculate total using final_price (Discounted Price)
-        $total = $cart->items->sum(function($item) {
-            // Use final_price here, NOT price
-            return $item->quantity * $item->product->final_price;
-        });
-
-        return view('cart.checkout', compact('cart','total'));
-    }
-
-    public function placeOrder(Request $request)
-    {
-        // 1. Validate Address Data
-        $request->validate([
-            'address' => 'required|string',
-            'phone' => 'required|string',
-        ]);
-
-        $cart = $this->getCart();
-
-        // Safety Check: Is cart empty?
-        if (!$cart || $cart->items->isEmpty()) {
-            return redirect()->back()->with('error', 'Cart is empty!');
+        // If GET or preview step, render checkout page
+        if ($request->isMethod('get') || !$request->has('confirm_order')) {
+            return view('cart.checkout', compact('cart'));
         }
 
-        // --- NEW SECTION: Create the Main Order Record ---
-        // Calculate total based on final_price (including discounts)
-        $totalAmount = $cart->items->sum(function($item) {
-            return $item->product->final_price * $item->quantity;
-        });
+        return DB::transaction(function () use ($request, $cart) {
+            $subtotal = $cart->items->sum(fn ($i) => $i->product->price * $i->quantity);
+            $discount = 0;
+            $couponCode = strtoupper(trim((string) $request->input('coupon_code')));
 
-        // Save to 'orders' table
-        $order = Order::create([
-            'user_id' => Auth::id(),
-            'total_amount' => $totalAmount
-        ]);
-        // ------------------------------------------------
+            if ($couponCode === 'MEGA20') {
+                $discount = round($subtotal * 0.20, 2);
+            } elseif ($couponCode && ($coupon = Coupon::where('code', $couponCode)->first())) {
+                if ($coupon->isValidFor($subtotal)) {
+                    $discount = $coupon->calculateDiscount($subtotal);
+                }
+            }
 
-        // 2. Loop Items: Reduce Stock AND Save History
-        foreach ($cart->items as $item) {
-            $product = $item->product;
+            $finalTotal = max(0, $subtotal - $discount);
+            $trackingNumber = 'NXM-' . strtoupper(Str::random(4)) . '-' . rand(100000, 999999);
 
-            // Check stock
-            if ($product->stock >= $item->quantity) {
+            $order = Order::create([
+                'user_id' => Auth::id(),
+                'total_price' => $finalTotal,
+                'status' => 'completed',
+                'tracking_number' => $trackingNumber,
+                'coupon_code' => $discount > 0 ? $couponCode : null,
+                'discount_amount' => $discount,
+                'payment_method' => $request->input('payment_method', 'card'),
+            ]);
 
-                // --- NEW SECTION: Save Item to Order History ---
+            foreach ($cart->items as $item) {
                 OrderItem::create([
                     'order_id' => $order->id,
-                    'product_name' => $product->name,      // Snapshot of name
-                    'price' => $product->final_price,      // Snapshot of price PAID
+                    'product_id' => $item->product_id,
                     'quantity' => $item->quantity,
-                    'discount_applied' => $product->discount ?? 0
+                    'price' => $item->product->price,
                 ]);
-                // -----------------------------------------------
-
-                // Reduce Stock
-                $product->decrement('stock', $item->quantity);
-
-            } else {
-                return redirect()->back()->with('error', 'Sorry, ' . $product->name . ' is now out of stock.');
+                $item->product->decrement('stock', min($item->product->stock, $item->quantity));
             }
-        }
 
-        // 3. Clear the Cart
-        $cart->items()->delete();
+            $cart->items()->delete();
 
-        return redirect('/')->with('success', 'Order placed successfully! Thank you for shopping.');
+            return view('cart.checkout', [
+                'cart' => $cart,
+                'completedOrder' => $order->load('items.product'),
+            ]);
+        });
     }
 }
