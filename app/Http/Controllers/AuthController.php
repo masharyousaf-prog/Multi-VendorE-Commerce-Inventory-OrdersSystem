@@ -30,8 +30,6 @@ class AuthController extends Controller
             'store_name' => 'nullable|required_if:role,vendor|string|max:120',
         ]);
 
-        // Requirement 3: Users are approved by default (is_active = true)
-        // Requirement 2: Removed NewUserRegistered admin notification
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
@@ -42,7 +40,6 @@ class AuthController extends Controller
             'store_slug' => $validated['role'] === 'vendor' ? Str::slug(($validated['store_name'] ?? $validated['name']) . '-' . Str::random(4)) : null,
         ]);
 
-        // Requirement 1: Issue JWT Token immediately upon registration
         $token = JWTAuth::fromUser($user);
 
         if ($request->expectsJson()) {
@@ -54,7 +51,7 @@ class AuthController extends Controller
             ], 201);
         }
 
-        return $this->redirectByRole($user, $token, 'Welcome aboard! Your account is active and ready.');
+        return $this->redirectByRole($user, $token, 'Welcome to NexaMart! Your account has been created.');
     }
 
     public function login(Request $request)
@@ -64,21 +61,36 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
+        // Check if account exists and is suspended before issuing token
+        $existingUser = User::where('email', $credentials['email'])->first();
+        if ($existingUser && Hash::check($credentials['password'], $existingUser->password) && !$existingUser->is_active) {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'Your account has been suspended by an administrator. Please contact support.'], 403);
+            }
+            return back()
+                ->withErrors(['email' => 'Your account has been suspended by an administrator. Please contact support.'])
+                ->withInput($request->only('email'));
+        }
+
         if (!$token = JWTAuth::attempt($credentials)) {
             if ($request->expectsJson()) {
                 return response()->json(['error' => 'Invalid email or password.'], 401);
             }
-            return back()->withErrors(['email' => 'Invalid login credentials.'])->withInput();
+            return back()->withErrors(['email' => 'Invalid email or password.'])->withInput($request->only('email'));
         }
 
         $user = JWTAuth::user();
 
-        if (!$user->is_active) {
-            JWTAuth::invalidate($token);
+        if (!$user || !$user->is_active) {
+            try {
+                JWTAuth::setToken($token)->invalidate();
+            } catch (\Throwable $e) {
+                // Ignore token invalidation error
+            }
             if ($request->expectsJson()) {
                 return response()->json(['error' => 'Your account has been suspended by an administrator.'], 403);
             }
-            return back()->withErrors(['email' => 'Your account has been suspended by an administrator.']);
+            return back()->withErrors(['email' => 'Your account has been suspended by an administrator.'])->withInput($request->only('email'));
         }
 
         if ($request->expectsJson()) {
@@ -90,7 +102,7 @@ class AuthController extends Controller
             ]);
         }
 
-        return $this->redirectByRole($user, $token, 'Signed in via JWT authentication.');
+        return $this->redirectByRole($user, $token, 'Welcome back, ' . $user->name . '!');
     }
 
     public function logout(Request $request)

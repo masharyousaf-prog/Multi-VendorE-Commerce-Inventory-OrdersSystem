@@ -37,17 +37,11 @@ class User extends Authenticatable implements JWTSubject
         ];
     }
 
-    /**
-     * Get the identifier that will be stored in the subject claim of the JWT.
-     */
     public function getJWTIdentifier(): mixed
     {
         return $this->getKey();
     }
 
-    /**
-     * Return a key value array, containing any custom claims to be added to the JWT.
-     */
     public function getJWTCustomClaims(): array
     {
         return [
@@ -55,6 +49,11 @@ class User extends Authenticatable implements JWTSubject
             'is_active' => (bool) $this->is_active,
             'email' => $this->email,
         ];
+    }
+
+    public function cart()
+    {
+        return $this->hasOne(Cart::class);
     }
 
     public function products()

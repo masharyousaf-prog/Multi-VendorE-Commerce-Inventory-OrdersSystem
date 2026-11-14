@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('categories', function (Blueprint $table) {
@@ -34,7 +31,10 @@ return new class extends Migration
             $table->decimal('compare_at_price', 10, 2)->nullable();
             $table->integer('discount')->default(0);
             $table->integer('stock')->default(0);
-            $table->string('image')->nullable();
+
+            // Fix: Changed from string() to longText() to support Base64 images
+            $table->longText('image')->nullable();
+
             $table->boolean('is_featured')->default(false);
             $table->boolean('is_flash_deal')->default(false);
             $table->timestamp('flash_deal_ends_at')->nullable();
@@ -44,9 +44,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('products');

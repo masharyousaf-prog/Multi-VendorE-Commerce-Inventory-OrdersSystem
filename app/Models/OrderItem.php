@@ -16,6 +16,7 @@ class OrderItem extends Model
         'quantity',
         'price',
         'discount_applied',
+        'status',
         'created_at',
         'updated_at',
     ];

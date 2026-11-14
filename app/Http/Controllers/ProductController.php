@@ -17,12 +17,10 @@ class ProductController extends Controller
     {
         $categories = Category::withCount('products')->get();
 
-        // Main Faceted Product Query
         $query = Product::with(['vendor:id,name,store_name,store_slug', 'category'])
             ->withAvg('reviews', 'rating')
             ->withCount('reviews');
 
-        // 1. Keyword Search (Name, Brand, SKU, Description, Vendor Store)
         if ($search = trim((string) $request->input('q'))) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -33,12 +31,10 @@ class ProductController extends Controller
             });
         }
 
-        // 2. Category Filter
         if ($categorySlug = $request->input('category')) {
             $query->whereHas('category', fn ($cq) => $cq->where('slug', $categorySlug));
         }
 
-        // 3. Price Range Filter
         if ($request->filled('min_price')) {
             $query->where('price', '>=', (float) $request->input('min_price'));
         }
@@ -46,7 +42,6 @@ class ProductController extends Controller
             $query->where('price', '<=', (float) $request->input('max_price'));
         }
 
-        // 4. Stock & Flash Deal Filters
         if ($request->boolean('in_stock')) {
             $query->where('stock', '>', 0);
         }
@@ -54,7 +49,6 @@ class ProductController extends Controller
             $query->where('is_flash_deal', true);
         }
 
-        // 5. Dynamic Sorting (Best Selling, Price Low-High, Price High-Low, Top Rated, Newest)
         match ($request->input('sort', 'featured')) {
             'price_asc' => $query->orderBy('price', 'asc'),
             'price_desc' => $query->orderBy('price', 'desc'),
@@ -66,25 +60,23 @@ class ProductController extends Controller
 
         $products = $query->paginate(12)->withQueryString();
 
-        // Curated Storefront Sections for Homepage Discovery
-        $flashDeals = Product::with(['vendor:id,name,store_name', 'category'])
+        // Issue 2 Fix: Strictly fetch products enrolled in Lightning Deals, newest first
+        $flashDeals = Product::with(['vendor:id,name,store_name,store_slug', 'category'])
             ->withAvg('reviews', 'rating')
+            ->where('is_flash_deal', true)
             ->where('stock', '>', 0)
-            ->where(function ($q) {
-                $q->where('is_flash_deal', true)
-                  ->orWhereNotNull('compare_at_price');
-            })
-            ->take(4)
+            ->latest()
+            ->take(8)
             ->get();
 
-        $topRatedProducts = Product::with(['vendor:id,name,store_name', 'category'])
+        $topRatedProducts = Product::with(['vendor:id,name,store_name,store_slug', 'category'])
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
             ->orderByDesc('reviews_avg_rating')
             ->take(4)
             ->get();
 
-        $wishlistProductIds = Auth::check()
+        $wishlistProductIds = (Auth::check() && Auth::user()->role === 'customer')
             ? Wishlist::where('user_id', Auth::id())->pluck('product_id')->toArray()
             : [];
 
@@ -108,18 +100,39 @@ class ProductController extends Controller
             ->take(4)
             ->get();
 
-        return view('products.show', compact('product', 'relatedProducts'));
+        $inWishlist = (Auth::check() && Auth::user()->role === 'customer')
+            ? Wishlist::where('user_id', Auth::id())->where('product_id', $product->id)->exists()
+            : false;
+
+        return view('products.show', compact('product', 'relatedProducts', 'inWishlist'));
+    }
+
+    public function wishlistIndex()
+    {
+        if (!Auth::check() || Auth::user()->role !== 'customer') {
+            abort(403, 'Only customer accounts have a wishlist.');
+        }
+
+        $wishlistItems = Wishlist::with(['product.vendor', 'product.category'])
+            ->where('user_id', Auth::id())
+            ->latest()
+            ->get();
+
+        return view('products.wishlist', compact('wishlistItems'));
     }
 
     public function storeReview(Request $request, Product $product)
     {
+        if (!Auth::check() || Auth::user()->role !== 'customer') {
+            abort(403, 'Only customer accounts can submit product reviews.');
+        }
+
         $validated = $request->validate([
             'rating' => 'required|integer|min:1|max:5',
             'title' => 'required|string|max:120',
             'comment' => 'required|string|max:1000',
         ]);
 
-        // Check if customer actually purchased this item
         $verified = Order::where('user_id', Auth::id())
             ->whereHas('items', fn ($q) => $q->where('product_id', $product->id))
             ->exists();
@@ -137,8 +150,15 @@ class ProductController extends Controller
         return back()->with('success', 'Thank you! Your review has been published.');
     }
 
-    public function toggleWishlist(Product $product)
+    public function toggleWishlist(Request $request, Product $product)
     {
+        if (!Auth::check() || Auth::user()->role !== 'customer') {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Only customers can use the wishlist.'], 403);
+            }
+            abort(403, 'Only customer accounts can save items to a wishlist.');
+        }
+
         $existing = Wishlist::where('user_id', Auth::id())
             ->where('product_id', $product->id)
             ->first();
@@ -146,16 +166,25 @@ class ProductController extends Controller
         if ($existing) {
             $existing->delete();
             $status = 'removed';
+            $inWishlist = false;
         } else {
             Wishlist::create(['user_id' => Auth::id(), 'product_id' => $product->id]);
             $status = 'added';
+            $inWishlist = true;
         }
 
-        if (request()->expectsJson()) {
-            return response()->json(['status' => $status]);
+        $wishlistCount = Wishlist::where('user_id', Auth::id())->count();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => $status,
+                'in_wishlist' => $inWishlist,
+                'wishlist_count' => $wishlistCount,
+                'message' => $inWishlist ? "\"{$product->name}\" saved to your wishlist!" : "\"{$product->name}\" removed from wishlist.",
+            ]);
         }
 
-        return back()->with('success', $status === 'added' ? 'Added to your Wishlist!' : 'Removed from Wishlist.');
+        return back()->with('success', $inWishlist ? 'Added to your Wishlist!' : 'Removed from Wishlist.');
     }
 
     public function vendorStore(string $slug)
@@ -166,9 +195,16 @@ class ProductController extends Controller
 
         $products = Product::with('category')
             ->withAvg('reviews', 'rating')
-            ->where('vendor_id', $vendor->id)
+            ->where(function ($q) use ($vendor) {
+                $q->where('vendor_id', $vendor->id)->orWhere('user_id', $vendor->id);
+            })
+            ->latest()
             ->paginate(12);
 
-        return view('products.vendor_store', compact('vendor', 'products'));
+        $wishlistProductIds = (Auth::check() && Auth::user()->role === 'customer')
+            ? Wishlist::where('user_id', Auth::id())->pluck('product_id')->toArray()
+            : [];
+
+        return view('products.vendor_store', compact('vendor', 'products', 'wishlistProductIds'));
     }
 }

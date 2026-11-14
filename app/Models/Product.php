@@ -12,6 +12,7 @@ class Product extends Model
 
     protected $fillable = [
         'vendor_id',
+        'user_id',
         'category_id',
         'name',
         'sku',
@@ -20,6 +21,7 @@ class Product extends Model
         'specifications',
         'price',
         'compare_at_price',
+        'discount',
         'stock',
         'image',
         'is_featured',
@@ -27,6 +29,9 @@ class Product extends Model
         'flash_deal_ends_at',
         'views_count',
     ];
+
+    // Automatically append these computed attributes so they are available in Blade and API JSON
+    protected $appends = ['image_url', 'discount_percentage', 'average_rating'];
 
     protected function casts(): array
     {
@@ -60,12 +65,31 @@ class Product extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    /**
+     * Resolves the correct image path whether it's an external seeded URL or a local upload.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (empty($this->image)) {
+            return null;
+        }
+
+        // If it's an external seeded URL (like Picsum or Placehold.co), return it directly
+        if (str_starts_with($this->image, 'http://') || str_starts_with($this->image, 'https://')) {
+            return $this->image;
+        }
+
+        // Otherwise, serve it via the local media route
+        $cleanPath = ltrim(str_replace('public/', '', $this->image), '/');
+        return url('/media/' . $cleanPath);
+    }
+
     public function getDiscountPercentageAttribute(): int
     {
         if ($this->compare_at_price && $this->compare_at_price > $this->price) {
             return (int) round((($this->compare_at_price - $this->price) / $this->compare_at_price) * 100);
         }
-        return 0;
+        return (int) ($this->discount ?? 0);
     }
 
     public function getAverageRatingAttribute(): float
